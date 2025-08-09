@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 本地书籍文件浏览器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .toolbar {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .select-btn {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .select-btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .current-path {
+            flex: 1;
+            padding: 10px 15px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            color: #666;
+        }
+        
+        .content {
+            display: flex;
+            height: 600px;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            border-right: 1px solid #eee;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .folder-node {
+            margin: 5px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .folder-node:hover {
+            transform: translateX(5px);
+        }
+        
+        .tag-0 {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 15px;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .tag-1 {
+            background: linear-gradient(45deg, #4ECDC4, #44A08D);
+            color: white;
+            padding: 10px 15px;
+            margin-left: 20px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .tag-2 {
+            background: linear-gradient(45deg, #FF6B6B, #EE5A24);
+            color: white;
+            padding: 8px 15px;
+            margin-left: 40px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        
+        .tag-3 {
+            background: linear-gradient(45deg, #96CEB4, #FFEAA7);
+            color: #333;
+            padding: 6px 15px;
+            margin-left: 60px;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        
+        .file-item {
+            background: #f8f9fa;
+            border: 1px solid #eee;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .file-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .file-icon {
+            margin-right: 8px;
+            color: #667eea;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .breadcrumb {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+        
+        .breadcrumb span {
+            color: #667eea;
+            cursor: pointer;
+        }
+        
+        .breadcrumb span:hover {
+            text-decoration: underline;
+        }
+        
+        .breadcrumb .separator {
+            color: #999;
+            margin: 0 8px;
+        }
+        
+        .file-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .file-checkbox {
+            margin-right: 10px;
+            transform: scale(1.2);
+            cursor: pointer;
+        }
+        
+        .file-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+        
+        .batch-actions {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .batch-actions.show {
+            display: block;
+        }
+        
+        .batch-btn {
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .batch-btn:hover {
+            background: #c82333;
+        }
+        
+        .batch-btn.success {
+            background: #28a745;
+        }
+        
+        .batch-btn.success:hover {
+            background: #218838;
+        }
+        
+        .selected-count {
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        
+        .move-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .move-dialog.show {
+            display: flex;
+        }
+        
+        .move-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        
+        .move-content h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .folder-selector {
+            margin: 20px 0;
+        }
+        
+        .folder-selector button {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        .folder-selector button:hover {
+            background: #5a6fd8;
+        }
+        
+        .selected-folder {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        
+        .dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .dialog-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .dialog-btn.cancel {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .dialog-btn.confirm {
+            background: #28a745;
+            color: white;
+        }
+        
+        .dialog-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 本地书籍文件浏览器</h1>
+            <p>选择你的书籍文件夹，自动构建层级结构</p>
+        </div>
+        
+        <div class="toolbar">
+            <button class="select-btn" onclick="selectFolder()">📁 选择文件夹</button>
+            <div class="current-path" id="currentPath">未选择文件夹</div>
+        </div>
+        
+        <div class="content">
+            <div class="sidebar">
+                <div id="folderTree">
+                    <div class="loading">请先选择文件夹</div>
+                </div>
+            </div>
+            
+            <div class="main-content">
+                <div id="stats" class="stats" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-number" id="folderCount">0</div>
+                        <div class="stat-label">文件夹数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="fileCount">0</div>
+                        <div class="stat-label">文件数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="levelCount">0</div>
+                        <div class="stat-label">层级深度</div>
+                    </div>
+                </div>
+                
+                <div id="breadcrumb" class="breadcrumb" style="display: none;"></div>
+                
+                <div id="currentFolder">
+                    <div class="loading">请选择文件夹开始浏览</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 批量操作栏 -->
+    <div id="batchActions" class="batch-actions">
+        <span class="selected-count" id="selectedCount">已选择 0 个文件</span>
+        <button class="batch-btn" onclick="selectAllFiles()">全选</button>
+        <button class="batch-btn" onclick="deselectAllFiles()">取消全选</button>
+        <button class="batch-btn success" onclick="showMoveDialog()">📁 批量转移</button>
+    </div>
+    
+    <!-- 转移对话框 -->
+    <div id="moveDialog" class="move-dialog">
+        <div class="move-content">
+            <h3>📁 批量转移文件</h3>
+            <p>选择目标文件夹，将选中的文件转移过去</p>
+            
+            <div class="folder-selector">
+                <button onclick="selectTargetFolder()">选择目标文件夹</button>
+                <div id="targetFolderPath" class="selected-folder" style="display: none;">
+                    未选择目标文件夹
+                </div>
+            </div>
+            
+            <div class="progress-bar" id="progressBar" style="display: none;">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            
+            <div id="moveStatus"></div>
+            
+            <div class="dialog-buttons">
+                <button class="dialog-btn cancel" onclick="closeMoveDialog()">取消</button>
+                <button class="dialog-btn confirm" onclick="executeMove()" id="confirmMoveBtn">确认转移</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDirHandle = null;
+        let folderStructure = null;
+        let currentPath = [];
+        let selectedFiles = new Set();
+        let targetFolderHandle = null;
+        
+        // 选择文件夹
+        async function selectFolder() {
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                currentDirHandle = dirHandle;
+                currentPath = [dirHandle.name];
+                
+                updateCurrentPath();
+                showLoading('正在扫描文件夹结构...');
+                
+                folderStructure = await scanDirectory(dirHandle, 0);
+                displayFolderTree(folderStructure);
+                displayCurrentFolder(folderStructure);
+                updateStats(folderStructure);
+                
+                showSuccess('文件夹扫描完成！');
+                
+            } catch (error) {
+                console.error('选择文件夹失败:', error);
+                if (error.name === 'AbortError') {
+                    showError('用户取消了文件夹选择');
+                } else {
+                    showError('选择文件夹失败: ' + error.message);
+                }
+            }
+        }
+        
+        // 扫描目录结构
+        async function scanDirectory(dirHandle, level = 0) {
+            const result = {
+                id: generateId(),
+                name: dirHandle.name,
+                path: dirHandle.path || '',
+                type: 'folder',
+                children: [],
+                level: level,
+                handle: dirHandle
+            };
+            
+            try {
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'directory') {
+                        const child = await scanDirectory(entry, level + 1);
+                        result.children.push(child);
+                    } else if (isBookFile(entry.name)) {
+                        result.children.push({
+                            id: generateId(),
+                            name: entry.name,
+                            type: 'file',
+                            level: level + 1,
+                            handle: entry
+                        });
+                    }
+                }
+            } catch (error) {
+                console.warn('扫描文件夹失败:', dirHandle.name, error);
+            }
+            
+            return result;
+        }
+        
+        // 判断是否为书籍文件（现在支持所有文件）
+        function isBookFile(filename) {
+            // 支持所有文件类型
+            return true;
+        }
+        
+        // 生成唯一ID
+        function generateId() {
+            return 'id_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // 显示文件夹树
+        function displayFolderTree(structure) {
+            const treeContainer = document.getElementById('folderTree');
+            
+            function renderNode(node) {
+                const tagType = getTagType(node.level);
+                const className = `tag-${Math.min(node.level, 3)}`;
+                
+                let childrenHtml = '';
+                if (node.children && node.children.length > 0) {
+                    childrenHtml = node.children.map(child => renderNode(child)).join('');
+                }
+                
+                return `
+                    <div class="folder-node ${className}" onclick="selectNode('${node.id}')" data-id="${node.id}">
+                        <span class="tag-type">${tagType}</span>
+                        <span class="folder-name">${node.name}</span>
+                        ${node.children ? `<span class="file-count">(${node.children.length})</span>` : ''}
+                    </div>
+                    ${childrenHtml}
+                `;
+            }
+            
+            treeContainer.innerHTML = renderNode(structure);
+        }
+        
+        // 获取标签类型
+        function getTagType(level) {
+            const types = ['大标签', '中标签', '小标签', '微标签'];
+            return types[Math.min(level, types.length - 1)];
+        }
+        
+        // 选择节点
+        function selectNode(nodeId) {
+            const node = findNodeById(folderStructure, nodeId);
+            if (node) {
+                displayCurrentFolder(node);
+                updateBreadcrumb(node);
+            }
+        }
+        
+        // 根据ID查找节点
+        function findNodeById(structure, id) {
+            if (structure.id === id) {
+                return structure;
+            }
+            
+            if (structure.children) {
+                for (const child of structure.children) {
+                    const found = findNodeById(child, id);
+                    if (found) return found;
+                }
+            }
+            
+            return null;
+        }
+        
+        // 显示当前文件夹内容
+        function displayCurrentFolder(node) {
+            const container = document.getElementById('currentFolder');
+            
+            if (!node.children || node.children.length === 0) {
+                container.innerHTML = '<div class="loading">此文件夹为空</div>';
+                return;
+            }
+            
+            let html = `<h3>📁 ${node.name} 的内容</h3>`;
+            
+            // 分类显示
+            const folders = node.children.filter(item => item.type === 'folder');
+            const files = node.children.filter(item => item.type === 'file');
+            
+            if (folders.length > 0) {
+                html += '<h4>📂 子文件夹</h4>';
+                folders.forEach(folder => {
+                    html += `
+                        <div class="folder-node tag-${Math.min(folder.level, 3)}" onclick="selectNode('${folder.id}')">
+                            📁 ${folder.name} (${folder.children ? folder.children.length : 0}项)
+                        </div>
+                    `;
+                });
+            }
+            
+            if (files.length > 0) {
+                html += '<h4>📄 文件列表</h4>';
+                files.forEach(file => {
+                    html += `
+                        <div class="file-item">
+                            <div class="file-info">
+                                <input type="checkbox" class="file-checkbox" id="file_${file.id}" onchange="toggleFileSelection('${file.id}')">
+                                <span class="file-icon">📄</span>
+                                <span onclick="openFile('${file.id}')" style="cursor: pointer; color: #667eea;">${file.name}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // 打开文件
+        async function openFile(fileId) {
+            const node = findNodeById(folderStructure, fileId);
+            if (node && node.handle) {
+                try {
+                    const file = await node.handle.getFile();
+                    const url = URL.createObjectURL(file);
+                    window.open(url, '_blank');
+                } catch (error) {
+                    showError('无法打开文件: ' + error.message);
+                }
+            }
+        }
+        
+        // 更新面包屑
+        function updateBreadcrumb(node) {
+            const breadcrumb = document.getElementById('breadcrumb');
+            breadcrumb.style.display = 'block';
+            
+            // 构建路径
+            const path = [];
+            let current = node;
+            while (current) {
+                path.unshift(current.name);
+                current = current.parent;
+            }
+            
+            let html = '';
+            path.forEach((name, index) => {
+                if (index > 0) {
+                    html += '<span class="separator">></span>';
+                }
+                html += `<span onclick="navigateToLevel(${index})">${name}</span>`;
+            });
+            
+            breadcrumb.innerHTML = html;
+        }
+        
+        // 更新统计信息
+        function updateStats(structure) {
+            const stats = document.getElementById('stats');
+            stats.style.display = 'grid';
+            
+            const folderCount = countFolders(structure);
+            const fileCount = countFiles(structure);
+            const levelCount = getMaxLevel(structure);
+            
+            document.getElementById('folderCount').textContent = folderCount;
+            document.getElementById('fileCount').textContent = fileCount;
+            document.getElementById('levelCount').textContent = levelCount;
+        }
+        
+        // 统计文件夹数量
+        function countFolders(node) {
+            let count = 1; // 当前节点
+            if (node.children) {
+                node.children.forEach(child => {
+                    if (child.type === 'folder') {
+                        count += countFolders(child);
+                    }
+                });
+            }
+            return count;
+        }
+        
+        // 统计文件数量
+        function countFiles(node) {
+            let count = 0;
+            if (node.children) {
+                node.children.forEach(child => {
+                    if (child.type === 'file') {
+                        count++;
+                    } else {
+                        count += countFiles(child);
+                    }
+                });
+            }
+            return count;
+        }
+        
+        // 获取最大层级
+        function getMaxLevel(node) {
+            let maxLevel = node.level;
+            if (node.children) {
+                node.children.forEach(child => {
+                    maxLevel = Math.max(maxLevel, getMaxLevel(child));
+                });
+            }
+            return maxLevel + 1;
+        }
+        
+        // 更新当前路径显示
+        function updateCurrentPath() {
+            const pathElement = document.getElementById('currentPath');
+            pathElement.textContent = currentPath.join(' > ');
+        }
+        
+        // 显示加载状态
+        function showLoading(message) {
+            const container = document.getElementById('currentFolder');
+            container.innerHTML = `<div class="loading">${message}</div>`;
+        }
+        
+        // 显示成功消息
+        function showSuccess(message) {
+            const container = document.getElementById('currentFolder');
+            container.innerHTML = `<div class="success">${message}</div>`;
+        }
+        
+        // 显示错误消息
+        function showError(message) {
+            const container = document.getElementById('currentFolder');
+            container.innerHTML = `<div class="error">${message}</div>`;
+        }
+        
+        // 切换文件选择状态
+        function toggleFileSelection(fileId) {
+            if (selectedFiles.has(fileId)) {
+                selectedFiles.delete(fileId);
+            } else {
+                selectedFiles.add(fileId);
+            }
+            updateBatchActions();
+            console.log('当前选择的文件:', Array.from(selectedFiles));
+        }
+        
+        // 更新批量操作栏
+        function updateBatchActions() {
+            const batchActions = document.getElementById('batchActions');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            console.log('更新批量操作栏，选择的文件数量:', selectedFiles.size);
+            
+            if (selectedFiles.size > 0) {
+                batchActions.classList.add('show');
+                selectedCount.textContent = `已选择 ${selectedFiles.size} 个文件`;
+                console.log('显示批量操作栏');
+            } else {
+                batchActions.classList.remove('show');
+                console.log('隐藏批量操作栏');
+            }
+        }
+        
+        // 全选文件
+        function selectAllFiles() {
+            const checkboxes = document.querySelectorAll('.file-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                const fileId = checkbox.id.replace('file_', '');
+                selectedFiles.add(fileId);
+            });
+            updateBatchActions();
+        }
+        
+        // 取消全选
+        function deselectAllFiles() {
+            const checkboxes = document.querySelectorAll('.file-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            selectedFiles.clear();
+            updateBatchActions();
+        }
+        
+        // 显示转移对话框
+        function showMoveDialog() {
+            if (selectedFiles.size === 0) {
+                alert('请先选择要转移的文件');
+                return;
+            }
+            
+            document.getElementById('moveDialog').classList.add('show');
+            targetFolderHandle = null;
+            document.getElementById('targetFolderPath').style.display = 'none';
+            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('moveStatus').innerHTML = '';
+        }
+        
+        // 选择目标文件夹
+        async function selectTargetFolder() {
+            try {
+                const dirHandle = await window.showDirectoryPicker();
+                targetFolderHandle = dirHandle;
+                document.getElementById('targetFolderPath').textContent = dirHandle.name;
+                document.getElementById('targetFolderPath').style.display = 'block';
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    alert('选择目标文件夹失败: ' + error.message);
+                }
+            }
+        }
+        
+        // 关闭转移对话框
+        function closeMoveDialog() {
+            document.getElementById('moveDialog').classList.remove('show');
+            targetFolderHandle = null;
+        }
+        
+        // 执行文件转移
+        async function executeMove() {
+            if (!targetFolderHandle) {
+                alert('请先选择目标文件夹');
+                return;
+            }
+            
+            const confirmBtn = document.getElementById('confirmMoveBtn');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const moveStatus = document.getElementById('moveStatus');
+            
+            confirmBtn.disabled = true;
+            progressBar.style.display = 'block';
+            moveStatus.innerHTML = '<p>正在转移文件...</p>';
+            
+            let successCount = 0;
+            let failCount = 0;
+            const totalFiles = selectedFiles.size;
+            let currentIndex = 0;
+            
+            for (const fileId of selectedFiles) {
+                try {
+                    const fileNode = findNodeById(folderStructure, fileId);
+                    if (fileNode && fileNode.handle) {
+                        // 获取源文件
+                        const sourceFile = await fileNode.handle.getFile();
+                        
+                        // 检查目标文件夹中是否已存在同名文件
+                        let targetFileName = fileNode.name;
+                        let counter = 1;
+                        
+                        while (true) {
+                            try {
+                                await targetFolderHandle.getFileHandle(targetFileName);
+                                // 文件已存在，重命名
+                                const nameParts = fileNode.name.split('.');
+                                const ext = nameParts.pop();
+                                const baseName = nameParts.join('.');
+                                targetFileName = `${baseName}_${counter}.${ext}`;
+                                counter++;
+                            } catch {
+                                // 文件不存在，可以使用这个名称
+                                break;
+                            }
+                        }
+                        
+                        // 创建新文件
+                        const targetFileHandle = await targetFolderHandle.getFileHandle(targetFileName, { create: true });
+                        const writable = await targetFileHandle.createWritable();
+                        
+                        // 写入文件内容
+                        await writable.write(sourceFile);
+                        await writable.close();
+                        
+                        // 删除原文件
+                        await fileNode.handle.remove();
+                        
+                        successCount++;
+                    }
+                } catch (error) {
+                    console.error('转移文件失败:', error);
+                    failCount++;
+                }
+                
+                currentIndex++;
+                const progress = (currentIndex / totalFiles) * 100;
+                progressFill.style.width = progress + '%';
+                
+                moveStatus.innerHTML = `
+                    <p>正在转移文件... (${currentIndex}/${totalFiles})</p>
+                    <p>成功: ${successCount}, 失败: ${failCount}</p>
+                `;
+            }
+            
+            // 转移完成
+            moveStatus.innerHTML = `
+                <div class="success">
+                    <p>转移完成！</p>
+                    <p>成功: ${successCount} 个文件</p>
+                    <p>失败: ${failCount} 个文件</p>
+                </div>
+            `;
+            
+            // 重新扫描文件夹结构
+            if (currentDirHandle) {
+                folderStructure = await scanDirectory(currentDirHandle, 0);
+                displayFolderTree(folderStructure);
+                displayCurrentFolder(folderStructure);
+                updateStats(folderStructure);
+            }
+            
+            // 清空选择
+            selectedFiles.clear();
+            updateBatchActions();
+            
+            // 3秒后关闭对话框
+            setTimeout(() => {
+                closeMoveDialog();
+            }, 3000);
+        }
+        
+        // 页面加载完成
+        window.onload = function() {
+            // 检查浏览器支持
+            if (!('showDirectoryPicker' in window)) {
+                showError('您的浏览器不支持文件系统访问API，请使用Chrome、Edge或Firefox最新版本');
+            }
+        };
+    </script>
+</body>
+</html> 
