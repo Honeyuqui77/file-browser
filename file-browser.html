@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>📚 醒醒专属书籍文件管理器</title>
+    <!-- 添加SheetJS库用于Excel导出 -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -69,6 +71,23 @@
         .select-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .export-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+        
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
         }
         
         .back-btn {
@@ -645,6 +664,7 @@
         
         <div class="toolbar">
             <button class="select-btn" onclick="selectFolder()">📁 选择文件夹</button>
+            <button class="export-btn" onclick="exportToExcel()" id="exportBtn" style="display: none;">📊 导出Excel</button>
             <div class="search-box">
                 <input type="text" class="search-input" placeholder="搜索文件或文件夹...">
                 <span class="search-icon">🔍</span>
@@ -1132,8 +1152,13 @@
             
             if (!node.children || node.children.length === 0) {
                 container.innerHTML = '<div class="loading">此文件夹为空</div>';
+                // 隐藏导出按钮
+                document.getElementById('exportBtn').style.display = 'none';
                 return;
             }
+            
+            // 显示导出按钮
+            document.getElementById('exportBtn').style.display = 'inline-block';
             
             let html = `<h3>📁 ${node.name} 的内容</h3>`;
             
@@ -1160,8 +1185,6 @@
                     html += `
                         <div class="file-item ${selectedClass}" data-file-id="${file.id}" data-file-index="${index}">
                             <div class="file-info">
-                                <input type="checkbox" class="file-checkbox" id="file_${file.id}" 
-                                       ${isSelected ? 'checked' : ''}>
                                 <span class="file-icon">📄</span>
                                 <span>${file.name}</span>
                             </div>
@@ -1724,6 +1747,174 @@
                 startItem = null;
                 endItem = null;
             });
+        }
+        
+        // 智能文件名解析器
+        function parseFileName(fileName) {
+            // 移除文件扩展名
+            const nameWithoutExt = fileName.replace(/\.[^.]*$/, '');
+            
+            let bookName = '';
+            let tags = [];
+            let author = '';
+            
+            // 1. 提取书名
+            // 检查是否有《》包围的书名
+            const bookNameMatch = nameWithoutExt.match(/《([^》]+)》/);
+            if (bookNameMatch) {
+                bookName = bookNameMatch[1];
+            } else {
+                // 如果没有《》，尝试提取开头的书名
+                // 书名通常在开头，到第一个特殊字符为止
+                const bookNameEnd = nameWithoutExt.search(/[（\(\[作者：BY—_]/);
+                if (bookNameEnd > 0) {
+                    bookName = nameWithoutExt.substring(0, bookNameEnd);
+                } else {
+                    bookName = nameWithoutExt;
+                }
+            }
+            
+            // 2. 提取标签
+            // 提取（）中的内容
+            const tagsMatch = nameWithoutExt.match(/[（\(]([^）\)]+)[）\)]/g);
+            if (tagsMatch) {
+                tagsMatch.forEach(tag => {
+                    const tagContent = tag.replace(/[（\(\)）]/g, '');
+                    if (tagContent && !tagContent.includes('作者：')) {
+                        tags.push(tagContent);
+                    }
+                });
+            }
+            
+            // 提取[]中的内容
+            const bracketTagsMatch = nameWithoutExt.match(/\[([^\]]+)\]/g);
+            if (bracketTagsMatch) {
+                bracketTagsMatch.forEach(tag => {
+                    const tagContent = tag.replace(/[\[\]]/g, '');
+                    if (tagContent) {
+                        tags.push(tagContent);
+                    }
+                });
+            }
+            
+            // 3. 提取作者
+            // 检查"作者："关键词
+            const authorMatch = nameWithoutExt.match(/作者：([^（\(]+)/);
+            if (authorMatch) {
+                author = authorMatch[1].trim();
+            } else {
+                // 检查"BY"关键词
+                const byMatch = nameWithoutExt.match(/BY\s+([^（\(]+)/i);
+                if (byMatch) {
+                    author = byMatch[1].trim();
+                } else {
+                    // 检查"_"分隔符
+                    const underscoreMatch = nameWithoutExt.match(/_([^（\(]+)$/);
+                    if (underscoreMatch) {
+                        author = underscoreMatch[1].trim();
+                    } else {
+                        // 检查"—"分隔符
+                        const dashMatch = nameWithoutExt.match(/—([^（\(]+)$/);
+                        if (dashMatch) {
+                            author = dashMatch[1].trim();
+                        }
+                    }
+                }
+            }
+            
+            // 清理和格式化
+            bookName = bookName.trim();
+            author = author.trim();
+            tags = tags.filter(tag => tag.trim() && !tag.includes('作者：'));
+            
+            return {
+                bookName: bookName || '未知书名',
+                tags: tags.join(' '),
+                author: author || '未知作者'
+            };
+        }
+        
+        // Excel导出功能
+        function exportToExcel() {
+            if (!currentDirHandle) {
+                alert('请先选择文件夹');
+                return;
+            }
+            
+            // 收集当前文件夹下的所有文件信息
+            const files = collectFilesForExport();
+            if (files.length === 0) {
+                alert('当前文件夹没有可导出的文件');
+                return;
+            }
+            
+            // 解析文件名并生成Excel数据
+            const excelData = files.map(file => {
+                const parsed = parseFileName(file.name);
+                return {
+                    '书名': parsed.bookName,
+                    '标签': parsed.tags,
+                    '作者': parsed.author
+                };
+            });
+            
+            // 创建工作簿
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            
+            // 设置列宽
+            ws['!cols'] = [
+                { width: 30 }, // 书名列
+                { width: 40 }, // 标签列
+                { width: 20 }  // 作者列
+            ];
+            
+            // 添加工作表到工作簿
+            XLSX.utils.book_append_sheet(wb, ws, '书籍信息');
+            
+            // 生成文件名 - 使用当前文件夹名称
+            let currentFolderName = '未知文件夹';
+            if (navigationHistory.length > 0) {
+                const currentNode = navigationHistory[currentHistoryIndex];
+                if (currentNode) {
+                    currentFolderName = currentNode.name;
+                }
+            }
+            const timestamp = new Date().toISOString().slice(0, 10); // 只取日期部分 YYYY-MM-DD
+            const fileName = `${currentFolderName}_书籍信息_${timestamp}.xlsx`;
+            
+            // 下载文件
+            XLSX.writeFile(wb, fileName);
+            
+            // 显示成功消息
+            showSuccess(`成功导出 ${files.length} 个文件到Excel！文件名：${fileName}`);
+        }
+        
+        // 收集当前文件夹下的文件信息
+        function collectFilesForExport() {
+            const files = [];
+            
+            // 递归收集所有文件
+            function collectFiles(node) {
+                if (node.type === 'file') {
+                    files.push({
+                        name: node.name,
+                        path: getItemPath(node)
+                    });
+                } else if (node.children) {
+                    node.children.forEach(child => collectFiles(child));
+                }
+            }
+            
+            // 从当前文件夹开始收集
+            if (navigationHistory.length > 0) {
+                const currentNode = navigationHistory[currentHistoryIndex];
+                if (currentNode) {
+                    collectFiles(currentNode);
+                }
+            }
+            
+            return files;
         }
         
         // 页面加载完成
