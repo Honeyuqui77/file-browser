@@ -413,14 +413,15 @@
         /* 帮助按钮样式 */
         .help-btn {
             position: fixed;
-            top: 30px;
-            left: 30px;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 15px 20px;
+            padding: 18px 25px;
             border-radius: 50px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
             transition: all 0.3s ease;
@@ -428,24 +429,62 @@
         }
         
         .help-btn:hover {
-            transform: translateY(-3px);
+            transform: translateX(-50%) translateY(-3px);
             box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
         }
         
         /* 技术支持联系方式 */
         .support-info {
             position: fixed;
-            top: 90px;
-            left: 30px;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
             color: #667eea;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 500;
             text-align: center;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 8px 15px;
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 20px;
+            border-radius: 25px;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
             z-index: 1000;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .support-info:hover {
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+            transform: translateX(-50%) scale(1.05);
+        }
+        
+        /* 爱心动画样式 */
+        .heart {
+            position: fixed;
+            font-size: 24px;
+            color: #ff6b6b;
+            pointer-events: none;
+            z-index: 2000;
+            animation: heartFloat 3s ease-out forwards;
+        }
+        
+        @keyframes heartFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            30% {
+                opacity: 0.9;
+                transform: translateY(-30px) scale(1.1);
+            }
+            60% {
+                opacity: 0.7;
+                transform: translateY(-60px) scale(1.3);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-100px) scale(1.6);
+            }
         }
         
         /* 帮助对话框样式 */
@@ -743,7 +782,7 @@
     <div class="help-btn" onclick="toggleHelp()">❓ 帮助</div>
     
     <!-- 技术支持联系方式 -->
-    <div class="support-info">
+    <div class="support-info" onclick="showHeart()">
         技术支持请联系：<br>
         <strong>shenyicheng3</strong>
     </div>
@@ -798,12 +837,6 @@
                         <li><strong>拖拽选择</strong>：按住鼠标左键拖拽选择范围</li>
                         <li><strong>自动滚动</strong>：拖拽到底部/顶部时自动滚动并选择更多文件</li>
                     </ul>
-                    
-                    <h4>累积选择</h4>
-                    <ul>
-                        <li>按住Shift键，可以多次选择不同范围的文件</li>
-                        <li>之前选择的文件会保留，新选择会添加到现有选择中</li>
-                    </ul>
                 </div>
                 
                 <div class="help-section">
@@ -817,23 +850,42 @@
                 </div>
                 
                 <div class="help-section">
-                    <h3>📊 统计信息</h3>
-                    <p>页面顶部显示三个统计卡片：</p>
+                    <h3>📊 Excel导出功能</h3>
+                    <p>点击"📊 导出Excel"按钮，系统会自动识别文件名并生成Excel表格：</p>
+                    
+                    <h4>智能识别规则</h4>
                     <ul>
-                        <li><strong>文件夹数</strong>：扫描到的文件夹总数</li>
-                        <li><strong>文件数</strong>：扫描到的文件总数</li>
-                        <li><strong>层级深度</strong>：文件夹的最大嵌套层级</li>
+                        <li><strong>书名</strong>：自动提取并添加《》符号</li>
+                        <li><strong>标签</strong>：自动识别四种括号中的内容</li>
+                        <li><strong>作者</strong>：自动识别多种格式的作者信息</li>
                     </ul>
-                </div>
-                
-                <div class="help-section">
-                    <h3>🎨 界面说明</h3>
+                    
+                    <h4>支持的标签格式</h4>
                     <ul>
-                        <li><strong>大标签</strong>：第一级文件夹（紫色渐变）</li>
-                        <li><strong>中标签</strong>：第二级文件夹（青绿色渐变）</li>
-                        <li><strong>小标签</strong>：第三级文件夹（橙红色渐变）</li>
-                        <li><strong>微标签</strong>：第四级及以下文件夹（黄绿色渐变）</li>
+                        <li><strong>中文括号</strong>：（校园 别扭受）</li>
+                        <li><strong>英文括号</strong>：(欧风 腹黑温柔攻)</li>
+                        <li><strong>方括号</strong>：[古代-NP]</li>
+                        <li><strong>中文方括号</strong>：【校园文】</li>
                     </ul>
+                    
+                    <h4>识别示例</h4>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                        <p><strong>示例1：</strong></p>
+                        <p>文件名：'受'为上、箜之伶（校园 别扭受）.txt</p>
+                        <p>识别结果：书名《'受'为上、箜之伶》 标签：校园 别扭受 作者：暂无作者</p>
+                        
+                        <p><strong>示例2：</strong></p>
+                        <p>文件名：[古代-NP]《为皇》作者：callme受（NP总攻）.txt</p>
+                        <p>识别结果：书名《为皇》 标签：古代-NP NP总攻 作者：callme受</p>
+                        
+                        <p><strong>示例3：</strong></p>
+                        <p>文件名：《不朽》BY Sophia (欧风 腹黑温柔攻X正直傲娇受).txt</p>
+                        <p>识别结果：书名《不朽》 标签：欧风 腹黑温柔攻X正直傲娇受 作者：Sophia</p>
+                        
+                        <p><strong>示例4：</strong></p>
+                        <p>文件名：简单文件名.txt</p>
+                        <p>识别结果：书名《简单文件名》 标签：暂无标签 作者：暂无作者</p>
+                    </div>
                 </div>
                 
                 <div class="help-section">
@@ -841,8 +893,7 @@
                     <ul>
                         <li><strong>快速定位</strong>：使用搜索功能快速找到目标文件</li>
                         <li><strong>批量整理</strong>：选择多个文件后使用批量转移功能整理文件</li>
-                        <li><strong>层级浏览</strong>：利用面包屑导航快速在不同层级间跳转</li>
-                        <li><strong>智能选择</strong>：使用Shift键和拖拽功能高效选择大量文件</li>
+                        <li><strong>智能导出</strong>：使用Excel导出功能，自动整理书籍信息</li>
                     </ul>
                 </div>
                 
@@ -1185,6 +1236,8 @@
                     html += `
                         <div class="file-item ${selectedClass}" data-file-id="${file.id}" data-file-index="${index}">
                             <div class="file-info">
+                                <input type="checkbox" class="file-checkbox" id="file_${file.id}" 
+                                       ${isSelected ? 'checked' : ''}>
                                 <span class="file-icon">📄</span>
                                 <span>${file.name}</span>
                             </div>
@@ -1766,7 +1819,7 @@
             } else {
                 // 如果没有《》，尝试提取开头的书名
                 // 书名通常在开头，到第一个特殊字符为止
-                const bookNameEnd = nameWithoutExt.search(/[（\(\[【作者：BY—_]/);
+                const bookNameEnd = nameWithoutExt.search(/[（\(\[【作者：作者:BY—_]/);
                 if (bookNameEnd > 0) {
                     bookName = nameWithoutExt.substring(0, bookNameEnd);
                 } else {
@@ -1808,6 +1861,17 @@
                 });
             }
             
+            // 提取()中的内容（英文括号）
+            const englishTagsMatch = nameWithoutExt.match(/\(([^)]+)\)/g);
+            if (englishTagsMatch) {
+                englishTagsMatch.forEach(tag => {
+                    const tagContent = tag.replace(/[()]/g, '');
+                    if (tagContent && !tagContent.includes('作者：') && !tagContent.includes('作者:')) {
+                        tags.push(tagContent);
+                    }
+                });
+            }
+            
             // 3. 提取作者
             // 检查"作者："关键词
             const authorMatch = nameWithoutExt.match(/作者：([^（\(\[【]+)/);
@@ -1842,7 +1906,10 @@
             // 清理和格式化
             bookName = bookName.trim();
             author = author.trim();
+            
+            // 标签去重和清理
             tags = tags.filter(tag => tag.trim() && !tag.includes('作者：') && !tag.includes('作者:'));
+            tags = [...new Set(tags)]; // 去重
             
             // 确保书名有《》
             if (bookName && !bookName.startsWith('《') && !bookName.endsWith('》')) {
@@ -1855,11 +1922,33 @@
                 }
             }
             
+            // 如果书名太长，可能是识别错误，尝试截取
+            if (bookName.length > 50) {
+                const firstBracket = bookName.indexOf('（');
+                const firstParenthesis = bookName.indexOf('(');
+                const firstSquare = bookName.indexOf('[');
+                const firstChineseSquare = bookName.indexOf('【');
+                
+                let cutPoint = Math.min(
+                    firstBracket > 0 ? firstBracket : Infinity,
+                    firstParenthesis > 0 ? firstParenthesis : Infinity,
+                    firstSquare > 0 ? firstSquare : Infinity,
+                    firstChineseSquare > 0 ? firstChineseSquare : Infinity
+                );
+                
+                if (cutPoint !== Infinity && cutPoint > 10) {
+                    bookName = bookName.substring(0, cutPoint);
+                    if (!bookName.endsWith('》')) {
+                        bookName = bookName + '》';
+                    }
+                }
+            }
+            
             return {
                 fileName: fileName, // 原始文件名
                 bookName: bookName || '《未知书名》',
-                tags: tags.join(' '),
-                author: author || '未知作者'
+                tags: tags.join(' ') || '暂无标签',
+                author: author || '暂无作者'
             };
         }
         
@@ -1870,15 +1959,23 @@
                 return;
             }
             
+            // 显示导出进度
+            showLoading('正在收集文件信息...');
+            
             // 收集当前文件夹下的所有文件信息
             const files = collectFilesForExport();
             if (files.length === 0) {
-                alert('当前文件夹没有可导出的文件');
+                showError('当前文件夹没有可导出的文件');
                 return;
             }
             
+            showLoading(`正在解析 ${files.length} 个文件名...`);
+            
             // 解析文件名并生成Excel数据
-            const excelData = files.map(file => {
+            const excelData = files.map((file, index) => {
+                if (index % 100 === 0) { // 每100个文件更新一次进度
+                    showLoading(`正在解析文件名... (${index + 1}/${files.length})`);
+                }
                 const parsed = parseFileName(file.name);
                 return {
                     '文件名': parsed.fileName,
@@ -1887,6 +1984,8 @@
                     '作者': parsed.author
                 };
             });
+            
+            showLoading('正在生成Excel文件...');
             
             // 创建工作簿
             const wb = XLSX.utils.book_new();
@@ -1913,6 +2012,8 @@
             }
             const timestamp = new Date().toISOString().slice(0, 10); // 只取日期部分 YYYY-MM-DD
             const fileName = `${currentFolderName}_书籍信息_${timestamp}.xlsx`;
+            
+            showLoading('正在下载文件...');
             
             // 下载文件
             XLSX.writeFile(wb, fileName);
@@ -1974,6 +2075,36 @@
                 helpDialog.classList.remove('show');
             }
         });
+        
+        // 显示爱心动画
+        function showHeart() {
+            // 创建爱心元素
+            const heart = document.createElement('div');
+            heart.className = 'heart';
+            heart.innerHTML = '❤️';
+            
+            // 设置爱心位置（在联系方式上方随机位置）
+            const supportInfo = document.querySelector('.support-info');
+            const rect = supportInfo.getBoundingClientRect();
+            
+            // 在按钮上方随机位置出现
+            const randomOffsetX = (Math.random() - 0.5) * rect.width; // 在按钮宽度范围内随机
+            const startX = rect.left + rect.width / 2 + randomOffsetX;
+            const startY = rect.top - 20; // 在按钮上方20px处开始
+            
+            heart.style.left = startX + 'px';
+            heart.style.top = startY + 'px';
+            
+            // 添加到页面
+            document.body.appendChild(heart);
+            
+            // 动画结束后移除元素（3秒后）
+            setTimeout(() => {
+                if (heart.parentNode) {
+                    heart.parentNode.removeChild(heart);
+                }
+            }, 3000);
+        }
     </script>
 </body>
 </html> 
