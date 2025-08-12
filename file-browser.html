@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📚 醒醒专属书籍文件管理器</title>
+    <title>📚 醒醒的专属书籍文件管理器</title>
     <!-- 添加SheetJS库用于Excel导出 -->
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -658,7 +658,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📚 醒醒专属书籍文件管理器</h1>
+            <h1>📚 醒醒的专属书籍文件管理器</h1>
             <p>选择你的书籍文件夹，自动构建层级结构</p>
         </div>
         
@@ -1766,7 +1766,7 @@
             } else {
                 // 如果没有《》，尝试提取开头的书名
                 // 书名通常在开头，到第一个特殊字符为止
-                const bookNameEnd = nameWithoutExt.search(/[（\(\[作者：BY—_]/);
+                const bookNameEnd = nameWithoutExt.search(/[（\(\[【作者：BY—_]/);
                 if (bookNameEnd > 0) {
                     bookName = nameWithoutExt.substring(0, bookNameEnd);
                 } else {
@@ -1780,7 +1780,7 @@
             if (tagsMatch) {
                 tagsMatch.forEach(tag => {
                     const tagContent = tag.replace(/[（\(\)）]/g, '');
-                    if (tagContent && !tagContent.includes('作者：')) {
+                    if (tagContent && !tagContent.includes('作者：') && !tagContent.includes('作者:')) {
                         tags.push(tagContent);
                     }
                 });
@@ -1797,26 +1797,43 @@
                 });
             }
             
+            // 提取【】中的内容
+            const bracketTagsMatch2 = nameWithoutExt.match(/【([^】]+)】/g);
+            if (bracketTagsMatch2) {
+                bracketTagsMatch2.forEach(tag => {
+                    const tagContent = tag.replace(/【】/g, '');
+                    if (tagContent) {
+                        tags.push(tagContent);
+                    }
+                });
+            }
+            
             // 3. 提取作者
             // 检查"作者："关键词
-            const authorMatch = nameWithoutExt.match(/作者：([^（\(]+)/);
+            const authorMatch = nameWithoutExt.match(/作者：([^（\(\[【]+)/);
             if (authorMatch) {
                 author = authorMatch[1].trim();
             } else {
-                // 检查"BY"关键词
-                const byMatch = nameWithoutExt.match(/BY\s+([^（\(]+)/i);
-                if (byMatch) {
-                    author = byMatch[1].trim();
+                // 检查"作者:"关键词
+                const authorMatch2 = nameWithoutExt.match(/作者:([^（\(\[【]+)/);
+                if (authorMatch2) {
+                    author = authorMatch2[1].trim();
                 } else {
-                    // 检查"_"分隔符
-                    const underscoreMatch = nameWithoutExt.match(/_([^（\(]+)$/);
-                    if (underscoreMatch) {
-                        author = underscoreMatch[1].trim();
+                    // 检查"BY"关键词
+                    const byMatch = nameWithoutExt.match(/BY\s+([^（\(\[【]+)/i);
+                    if (byMatch) {
+                        author = byMatch[1].trim();
                     } else {
-                        // 检查"—"分隔符
-                        const dashMatch = nameWithoutExt.match(/—([^（\(]+)$/);
-                        if (dashMatch) {
-                            author = dashMatch[1].trim();
+                        // 检查"_"分隔符
+                        const underscoreMatch = nameWithoutExt.match(/_([^（\(\[【]+)$/);
+                        if (underscoreMatch) {
+                            author = underscoreMatch[1].trim();
+                        } else {
+                            // 检查"—"分隔符
+                            const dashMatch = nameWithoutExt.match(/—([^（\(\[【]+)$/);
+                            if (dashMatch) {
+                                author = dashMatch[1].trim();
+                            }
                         }
                     }
                 }
@@ -1825,10 +1842,22 @@
             // 清理和格式化
             bookName = bookName.trim();
             author = author.trim();
-            tags = tags.filter(tag => tag.trim() && !tag.includes('作者：'));
+            tags = tags.filter(tag => tag.trim() && !tag.includes('作者：') && !tag.includes('作者:'));
+            
+            // 确保书名有《》
+            if (bookName && !bookName.startsWith('《') && !bookName.endsWith('》')) {
+                if (bookName.startsWith('《') && !bookName.endsWith('》')) {
+                    bookName = bookName + '》';
+                } else if (!bookName.startsWith('《') && bookName.endsWith('》')) {
+                    bookName = '《' + bookName;
+                } else {
+                    bookName = '《' + bookName + '》';
+                }
+            }
             
             return {
-                bookName: bookName || '未知书名',
+                fileName: fileName, // 原始文件名
+                bookName: bookName || '《未知书名》',
                 tags: tags.join(' '),
                 author: author || '未知作者'
             };
@@ -1852,6 +1881,7 @@
             const excelData = files.map(file => {
                 const parsed = parseFileName(file.name);
                 return {
+                    '文件名': parsed.fileName,
                     '书名': parsed.bookName,
                     '标签': parsed.tags,
                     '作者': parsed.author
@@ -1864,6 +1894,7 @@
             
             // 设置列宽
             ws['!cols'] = [
+                { width: 40 }, // 文件名列
                 { width: 30 }, // 书名列
                 { width: 40 }, // 标签列
                 { width: 20 }  // 作者列
