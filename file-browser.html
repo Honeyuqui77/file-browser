@@ -107,6 +107,24 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(108, 117, 125, 0.4);
         }
+
+        .path-btn {
+            background: linear-gradient(135deg, #fd7e14 0%, #e63946 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(253, 126, 20, 0.3);
+            margin-left: 10px;
+        }
+
+        .path-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(253, 126, 20, 0.4);
+        }
         
         .search-box {
             flex: 1;
@@ -710,6 +728,7 @@
             </div>
             <div class="current-path" id="currentPath">未选择文件夹</div>
             <button class="back-btn" onclick="goBack()">⬅️ 返回</button>
+            <button class="path-btn" onclick="setBasePath()" title="设置完整路径">📍 设置路径</button>
         </div>
         
         <div class="content">
@@ -853,6 +872,18 @@
                     <h3>📊 Excel导出功能</h3>
                     <p>点击"📊 导出Excel"按钮，系统会自动识别文件名并生成Excel表格：</p>
                     
+                    <h4>导出内容</h4>
+                    <ul>
+                        <li><strong>文件名</strong>：原始文件名</li>
+                        <li><strong>书名</strong>：自动提取并添加《》符号</li>
+                        <li><strong>标签</strong>：自动识别四种括号中的内容</li>
+                        <li><strong>作者</strong>：自动识别多种格式的作者信息</li>
+                        <li><strong>文件路径</strong>：记录文件所在的完整路径（可手动设置）</li>
+                    </ul>
+                    
+                    <h4>路径设置说明</h4>
+                    <p>点击"📍 设置路径"按钮可以手动设置文件夹的完整路径，这样导出的Excel中就会显示完整的文件系统路径而不是相对路径。</p>
+                    
                     <h4>智能识别规则</h4>
                     <ul>
                         <li><strong>书名</strong>：自动提取并添加《》符号</li>
@@ -883,6 +914,14 @@
                         <p>识别结果：书名《不朽》 标签：欧风 腹黑温柔攻X正直傲娇受 作者：Sophia</p>
                         
                         <p><strong>示例4：</strong></p>
+                        <p>文件名：《书名》作者一个茶壶【校园】.txt</p>
+                        <p>识别结果：书名《书名》 标签：校园 作者：一个茶壶</p>
+                        
+                        <p><strong>示例5：</strong></p>
+                        <p>文件名：《另一本书》by一个充电器（现代）.txt</p>
+                        <p>识别结果：书名《另一本书》 标签：现代 作者：一个充电器</p>
+                        
+                        <p><strong>示例6：</strong></p>
                         <p>文件名：简单文件名.txt</p>
                         <p>识别结果：书名《简单文件名》 标签：暂无标签 作者：暂无作者</p>
                     </div>
@@ -918,6 +957,7 @@
         let targetFolderHandle = null;
         let navigationHistory = [];
         let currentHistoryIndex = -1;
+        let fullBasePath = ''; // 存储完整的基础路径
         let lastSelectedFile = null;
         let isShiftPressed = false;
         
@@ -999,10 +1039,24 @@
         function getItemPath(item) {
             const path = [];
             let current = item;
+            
+            // 从当前项目开始，向上构建路径直到根目录
             while (current && current.name) {
                 path.unshift(current.name);
                 current = current.parent;
             }
+            
+            // 使用存储的完整基础路径替代根目录名
+            if (path.length > 0 && fullBasePath) {
+                // 移除第一个元素（根目录名），用完整路径替代
+                path[0] = fullBasePath;
+                return path.join('\\');
+            } else if (path.length > 0 && currentDirHandle && currentDirHandle.name) {
+                // 如果没有完整路径，使用文件夹名
+                path[0] = `[${currentDirHandle.name}]`;
+                return path.join(' > ');
+            }
+            
             return path.join(' > ');
         }
         
@@ -1061,12 +1115,380 @@
             }
         }
         
+        // 智能路径预测系统
+        async function getFullPath(dirHandle) {
+            try {
+                const folderName = dirHandle.name;
+                
+                // 方法1: 基于历史模式的智能预测
+                const predictedPath = predictPathFromHistory(folderName);
+                if (predictedPath) {
+                    console.log('基于历史模式预测路径:', predictedPath);
+                    return predictedPath;
+                }
+                
+                // 方法2: 基于文件夹名称模式的预测
+                const patternPath = predictPathFromFolderPattern(folderName);
+                if (patternPath) {
+                    console.log('基于文件夹模式预测路径:', patternPath);
+                    return patternPath;
+                }
+                
+                // 方法3: 尝试从第一个文件获取webkitRelativePath
+                try {
+                    for await (const entry of dirHandle.values()) {
+                        if (entry.kind === 'file') {
+                            const file = await entry.getFile();
+                            if (file.webkitRelativePath) {
+                                const pathParts = file.webkitRelativePath.split('/');
+                                pathParts.pop(); // 移除文件名
+                                if (pathParts.length > 0) {
+                                    return pathParts.join('\\');
+                                }
+                            }
+                            break; // 只检查第一个文件
+                        }
+                    }
+                } catch (fileError) {
+                    console.warn('无法从文件获取路径:', fileError);
+                }
+                
+                // 方法4: 默认智能推测
+                const username = getUsername();
+                return `C:\\Users\\${username}\\Desktop\\${folderName}`;
+                
+            } catch (error) {
+                console.warn('无法获取完整路径:', error);
+                return null;
+            }
+        }
+        
+        // 基于历史记录预测路径
+        function predictPathFromHistory(folderName) {
+            try {
+                const pathHistory = JSON.parse(localStorage.getItem('pathHistory') || '[]');
+                const pathPatterns = JSON.parse(localStorage.getItem('pathPatterns') || '{}');
+                
+                // 查找相似的文件夹名称
+                for (const historyPath of pathHistory) {
+                    const historyFolder = historyPath.split('\\').pop();
+                    
+                    // 如果找到相同的文件夹名
+                    if (historyFolder === folderName) {
+                        return historyPath;
+                    }
+                    
+                    // 如果找到相似的文件夹名（包含关键词）
+                    if (historyFolder && folderName && 
+                        (historyFolder.includes(folderName) || folderName.includes(historyFolder))) {
+                        const basePath = historyPath.substring(0, historyPath.lastIndexOf('\\'));
+                        return `${basePath}\\${folderName}`;
+                    }
+                }
+                
+                // 基于路径模式预测
+                const mostCommonPattern = Object.keys(pathPatterns).reduce((a, b) => 
+                    pathPatterns[a] > pathPatterns[b] ? a : b, Object.keys(pathPatterns)[0]);
+                
+                if (mostCommonPattern) {
+                    return `${mostCommonPattern}\\${folderName}`;
+                }
+                
+                return null;
+            } catch (error) {
+                console.warn('历史预测失败:', error);
+                return null;
+            }
+        }
+        
+        // 基于文件夹名称模式预测路径
+        function predictPathFromFolderPattern(folderName) {
+            const patterns = [
+                // 测试相关
+                { keywords: ['测试', 'test', 'Test'], basePath: 'E:\\WXWork\\5.0.0.8002\\bugly\\x64' },
+                // 下载相关
+                { keywords: ['下载', 'download', 'Download'], basePath: `C:\\Users\\${getUsername()}\\Downloads` },
+                // 桌面相关
+                { keywords: ['桌面', 'desktop', 'Desktop'], basePath: `C:\\Users\\${getUsername()}\\Desktop` },
+                // 文档相关
+                { keywords: ['文档', 'document', 'Document'], basePath: `C:\\Users\\${getUsername()}\\Documents` },
+                // 项目相关
+                { keywords: ['项目', 'project', 'Project', 'work', 'Work'], basePath: 'D:\\Projects' },
+                // 书籍相关
+                { keywords: ['书', '小说', 'book', 'novel', '阅读'], basePath: 'E:\\Books' }
+            ];
+            
+            for (const pattern of patterns) {
+                for (const keyword of pattern.keywords) {
+                    if (folderName.toLowerCase().includes(keyword.toLowerCase())) {
+                        return `${pattern.basePath}\\${folderName}`;
+                    }
+                }
+            }
+            
+            return null;
+        }
+        
+        // 获取当前用户名（尝试从各种来源）
+        function getUsername() {
+            try {
+                // 尝试从各种可能的来源获取用户名
+                
+                // 方法1: 从localStorage获取之前保存的用户名
+                const savedUsername = localStorage.getItem('detectedUsername');
+                if (savedUsername) {
+                    return savedUsername;
+                }
+                
+                // 方法2: 尝试从navigator获取一些信息
+                if (navigator.userAgentData && navigator.userAgentData.platform) {
+                    console.log('平台信息:', navigator.userAgentData.platform);
+                }
+                
+                // 方法3: 检查是否在常见的中文环境
+                const isChineseEnv = navigator.language && navigator.language.includes('zh');
+                
+                // 返回更合适的默认用户名
+                return isChineseEnv ? '用户' : 'User';
+            } catch (error) {
+                return 'User';
+            }
+        }
+        
+        // 智能检测并保存用户信息
+        function detectAndSaveUserInfo() {
+            // 如果用户之前设置过完整路径，从中提取用户名
+            if (fullBasePath && fullBasePath.includes('C:\\Users\\')) {
+                const match = fullBasePath.match(/C:\\Users\\([^\\]+)\\/);
+                if (match && match[1]) {
+                    const detectedUsername = match[1];
+                    localStorage.setItem('detectedUsername', detectedUsername);
+                    console.log('从路径中检测到用户名:', detectedUsername);
+                    return detectedUsername;
+                }
+            }
+            return null;
+        }
+        
+        // 生成智能路径建议
+        function generateSmartSuggestions(folderName, username) {
+            const suggestions = [];
+            
+            try {
+                // 1. 优先级最高：完全匹配的文件夹名
+                const folderPatterns = JSON.parse(localStorage.getItem('folderPatterns') || '{}');
+                if (folderPatterns[folderName]) {
+                    suggestions.push(`${folderPatterns[folderName].basePath}\\${folderName} (智能推荐)`);
+                }
+                
+                // 2. 基于相似文件夹名的预测
+                Object.keys(folderPatterns).forEach(savedFolder => {
+                    if (savedFolder !== folderName && 
+                        (savedFolder.includes(folderName) || folderName.includes(savedFolder))) {
+                        const basePath = folderPatterns[savedFolder].basePath;
+                        const suggestedPath = `${basePath}\\${folderName} (相似推荐)`;
+                        if (!suggestions.includes(suggestedPath)) {
+                            suggestions.push(suggestedPath);
+                        }
+                    }
+                });
+                
+                // 3. 基于最常用的基础路径
+                const pathPatterns = JSON.parse(localStorage.getItem('pathPatterns') || '{}');
+                const sortedPatterns = Object.keys(pathPatterns)
+                    .sort((a, b) => pathPatterns[b] - pathPatterns[a])
+                    .slice(0, 3);
+                
+                sortedPatterns.forEach(basePath => {
+                    const suggestedPath = `${basePath}\\${folderName} (常用位置)`;
+                    if (!suggestions.some(s => s.includes(basePath))) {
+                        suggestions.push(suggestedPath);
+                    }
+                });
+                
+                // 4. 最近使用的路径（修改为当前文件夹名）
+                const pathHistory = JSON.parse(localStorage.getItem('pathHistory') || '[]');
+                pathHistory.slice(0, 2).forEach(historyPath => {
+                    const basePath = historyPath.substring(0, historyPath.lastIndexOf('\\'));
+                    const suggestedPath = `${basePath}\\${folderName} (最近位置)`;
+                    if (!suggestions.some(s => s.includes(basePath))) {
+                        suggestions.push(suggestedPath);
+                    }
+                });
+                
+            } catch (error) {
+                console.warn('生成智能建议失败:', error);
+            }
+            
+            // 5. 如果没有历史记录，添加基于文件夹名的智能预测
+            if (suggestions.length === 0) {
+                const patternPath = predictPathFromFolderPattern(folderName);
+                if (patternPath) {
+                    suggestions.push(`${patternPath} (模式匹配)`);
+                }
+            }
+            
+            // 6. 添加常见的默认路径（避免重复）
+            const defaultPaths = [
+                `C:\\Users\\${username}\\Desktop\\${folderName}`,
+                `C:\\Users\\${username}\\Documents\\${folderName}`,
+                `C:\\Users\\${username}\\Downloads\\${folderName}`,
+                `D:\\${folderName}`,
+                `E:\\${folderName}`
+            ];
+            
+            defaultPaths.forEach(path => {
+                const basePath = path.substring(0, path.lastIndexOf('\\'));
+                if (!suggestions.some(s => s.includes(basePath))) {
+                    suggestions.push(path);
+                }
+            });
+            
+            // 7. 添加自定义选项
+            suggestions.push('自定义路径...');
+            
+            return suggestions.slice(0, 8); // 最多显示8个选项
+        }
+
+        // 设置完整基础路径
+        function setBasePath() {
+            if (!currentDirHandle) {
+                alert('请先选择文件夹');
+                return;
+            }
+            
+            const folderName = currentDirHandle.name;
+            const username = getUsername();
+            
+            // 生成智能建议
+            const suggestions = generateSmartSuggestions(folderName, username);
+            
+            const currentPath = fullBasePath || suggestions[0];
+            
+            let message = `请选择或输入文件夹的完整路径：\n\n`;
+            message += `常用路径选项：\n`;
+            suggestions.forEach((path, index) => {
+                message += `${index + 1}. ${path}\n`;
+            });
+            message += `\n请输入选项编号(1-${suggestions.length})或直接输入完整路径：`;
+            
+            const userInput = prompt(message, '1');
+            
+            if (userInput && userInput.trim()) {
+                const input = userInput.trim();
+                
+                // 检查是否是数字选择
+                const optionNum = parseInt(input);
+                if (optionNum >= 1 && optionNum <= suggestions.length) {
+                    if (optionNum === suggestions.length) {
+                        // 选择了"自定义路径"
+                        const customPath = prompt('请输入完整的文件夹路径：', currentPath);
+                        if (customPath && customPath.trim()) {
+                            fullBasePath = customPath.trim();
+                        }
+                    } else {
+                        // 选择了预设路径
+                        fullBasePath = suggestions[optionNum - 1];
+                    }
+                } else {
+                    // 直接输入了路径
+                    fullBasePath = input;
+                }
+                
+                if (fullBasePath) {
+                    // 保存到历史记录
+                    savePathToHistory(fullBasePath);
+                    
+                    // 尝试从路径中检测用户名
+                    detectAndSaveUserInfo();
+                    
+                    showSuccess(`已设置完整路径：${fullBasePath}`);
+                    console.log('设置的完整路径:', fullBasePath);
+                    
+                    // 更新当前路径显示
+                    updateCurrentPath();
+                }
+            }
+        }
+        
+        // 保存路径到历史记录并学习模式
+        function savePathToHistory(path) {
+            try {
+                // 保存完整路径历史
+                let pathHistory = JSON.parse(localStorage.getItem('pathHistory') || '[]');
+                pathHistory = pathHistory.filter(p => p !== path);
+                pathHistory.unshift(path);
+                pathHistory = pathHistory.slice(0, 10);
+                localStorage.setItem('pathHistory', JSON.stringify(pathHistory));
+                
+                // 学习路径模式（提取基础路径）
+                const basePath = path.substring(0, path.lastIndexOf('\\'));
+                let pathPatterns = JSON.parse(localStorage.getItem('pathPatterns') || '{}');
+                pathPatterns[basePath] = (pathPatterns[basePath] || 0) + 1;
+                localStorage.setItem('pathPatterns', JSON.stringify(pathPatterns));
+                
+                // 学习文件夹名称模式
+                const folderName = path.split('\\').pop();
+                let folderPatterns = JSON.parse(localStorage.getItem('folderPatterns') || '{}');
+                folderPatterns[folderName] = {
+                    basePath: basePath,
+                    count: (folderPatterns[folderName]?.count || 0) + 1,
+                    lastUsed: Date.now()
+                };
+                localStorage.setItem('folderPatterns', JSON.stringify(folderPatterns));
+                
+                console.log('路径已保存并学习模式:', path);
+                console.log('基础路径使用次数:', pathPatterns[basePath]);
+            } catch (error) {
+                console.warn('保存路径历史失败:', error);
+            }
+        }
+        
+        // 清除路径历史记录
+        function clearPathHistory() {
+            if (confirm('确定要清除所有路径历史记录和学习的模式吗？这将重置智能推荐系统。')) {
+                localStorage.removeItem('pathHistory');
+                localStorage.removeItem('pathPatterns');
+                localStorage.removeItem('folderPatterns');
+                localStorage.removeItem('detectedUsername');
+                showSuccess('路径历史记录和智能模式已清除');
+            }
+        }
+
         // 选择文件夹
         async function selectFolder() {
             try {
                 const dirHandle = await window.showDirectoryPicker();
                 currentDirHandle = dirHandle;
                 currentPath = [dirHandle.name];
+                
+                // 尝试获取完整路径
+                showLoading('正在获取路径信息...');
+                const detectedPath = await getFullPath(dirHandle);
+                if (detectedPath) {
+                    fullBasePath = detectedPath;
+                    console.log('智能推测的路径:', fullBasePath);
+                    
+                    // 询问用户是否要修正路径
+                    setTimeout(() => {
+                        if (confirm(`系统推测的文件夹路径为：\n${fullBasePath}\n\n是否正确？点击"取消"来手动设置正确路径。`)) {
+                            showSuccess(`已使用推测路径：${fullBasePath}`);
+                        } else {
+                            setBasePath();
+                        }
+                    }, 1000);
+                } else {
+                    // 如果无法获取完整路径，使用文件夹名作为基础路径
+                    fullBasePath = `[${dirHandle.name}]`;
+                    console.log('使用文件夹名作为基础路径:', fullBasePath);
+                    
+                    // 提示用户可以设置完整路径
+                    setTimeout(() => {
+                        if (confirm(`无法自动检测完整路径。\n当前使用：${fullBasePath}\n\n是否要设置完整的文件夹路径以获得更好的导出效果？`)) {
+                            setBasePath();
+                        }
+                    }, 1000);
+                }
                 
                 updateCurrentPath();
                 showLoading('正在扫描文件夹结构...');
@@ -1819,7 +2241,7 @@
             } else {
                 // 如果没有《》，尝试提取开头的书名
                 // 书名通常在开头，到第一个特殊字符为止
-                const bookNameEnd = nameWithoutExt.search(/[（\(\[【作者：作者:BY—_]/);
+                const bookNameEnd = nameWithoutExt.search(/[（\(\[【作者：作者:作者BY—_]/);
                 if (bookNameEnd > 0) {
                     bookName = nameWithoutExt.substring(0, bookNameEnd);
                 } else {
@@ -1883,20 +2305,32 @@
                 if (authorMatch2) {
                     author = authorMatch2[1].trim();
                 } else {
-                    // 检查"BY"关键词
-                    const byMatch = nameWithoutExt.match(/BY\s+([^（\(\[【]+)/i);
-                    if (byMatch) {
-                        author = byMatch[1].trim();
+                    // 检查"作者"关键词（不带冒号）
+                    const authorMatch3 = nameWithoutExt.match(/作者([^（\(\[【]+)/);
+                    if (authorMatch3) {
+                        author = authorMatch3[1].trim();
                     } else {
-                        // 检查"_"分隔符
-                        const underscoreMatch = nameWithoutExt.match(/_([^（\(\[【]+)$/);
-                        if (underscoreMatch) {
-                            author = underscoreMatch[1].trim();
+                        // 检查"BY"关键词（带空格）
+                        const byMatch = nameWithoutExt.match(/BY\s+([^（\(\[【]+)/i);
+                        if (byMatch) {
+                            author = byMatch[1].trim();
                         } else {
-                            // 检查"—"分隔符
-                            const dashMatch = nameWithoutExt.match(/—([^（\(\[【]+)$/);
-                            if (dashMatch) {
-                                author = dashMatch[1].trim();
+                            // 检查"by"关键词（不区分大小写，不要求空格）
+                            const byMatch2 = nameWithoutExt.match(/by([^（\(\[【]+)/i);
+                            if (byMatch2) {
+                                author = byMatch2[1].trim();
+                            } else {
+                                // 检查"_"分隔符
+                                const underscoreMatch = nameWithoutExt.match(/_([^（\(\[【]+)$/);
+                                if (underscoreMatch) {
+                                    author = underscoreMatch[1].trim();
+                                } else {
+                                    // 检查"—"分隔符
+                                    const dashMatch = nameWithoutExt.match(/—([^（\(\[【]+)$/);
+                                    if (dashMatch) {
+                                        author = dashMatch[1].trim();
+                                    }
+                                }
                             }
                         }
                     }
@@ -1981,7 +2415,8 @@
                     '文件名': parsed.fileName,
                     '书名': parsed.bookName,
                     '标签': parsed.tags,
-                    '作者': parsed.author
+                    '作者': parsed.author,
+                    '文件路径': file.path
                 };
             });
             
@@ -1996,7 +2431,8 @@
                 { width: 40 }, // 文件名列
                 { width: 30 }, // 书名列
                 { width: 40 }, // 标签列
-                { width: 20 }  // 作者列
+                { width: 20 }, // 作者列
+                { width: 50 }  // 文件路径列
             ];
             
             // 添加工作表到工作簿
@@ -2076,7 +2512,7 @@
             }
         });
         
-        // 显示爱心动画
+        // 显示爱心动画+
         function showHeart() {
             // 创建爱心元素
             const heart = document.createElement('div');
